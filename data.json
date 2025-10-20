@@ -1,0 +1,12 @@
+{
+  "chart_title": "Study Spots Popularity",
+  "data_points": [
+    { "label": "PG 3", "value": 35 },
+    { "label": "GT connector study rooms", "value": 22 },
+    { "label": "Cros 7", "value": 28 },
+    { "label": "StuCen", "value": 18 },
+    { "label": "Klaus", "value": 14 },
+    { "label": "Tech Green", "value": 12 },
+    { "label": "Dining Hall", "value": 9 }
+  ]
+}
