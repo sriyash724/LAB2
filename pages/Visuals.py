@@ -73,7 +73,7 @@ st.divider()
 st.header("Graphs")
 
 # GRAPH 1: STATIC GRAPH (BAR)
-st.subheader("Graph 1: Static – Baseline from JSON (Bar)")
+st.subheader("Graph 1: Baseline Bar Graph")
 # Static bar chart using data.json as a reference baseline.
 if not json_bar_df.empty:
     st.bar_chart(json_bar_df)
@@ -91,7 +91,7 @@ if "favorites" not in st.session_state:
     st.session_state["favorites"] = []  # persistent list across interactions  #NEW
 
 # GRAPH 2: DYNAMIC GRAPH (LINE) – Average rating per spot
-st.subheader("Graph 2: Dynamic – Average rating per spot (Line, CSV)")
+st.subheader("Graph 2: Average rating per spot")
 # - Dynamic line chart driven by multiselect + Top-K slider.
 # - Uses Session State for a persistent favorites list.
 
@@ -138,7 +138,7 @@ else:
         st.info("No rows match your current selection.")
 
 # GRAPH 3: DYNAMIC GRAPH (SCATTER) – Number of ratings per spot
-st.subheader("Graph 3: Dynamic – Number of ratings per spot (Scatter, CSV)")
+st.subheader("Graph 3: Number of ratings per spot")
 # - Dynamic scatter chart that counts how many ratings each spot has received.
 
 if len(csv_df) == 0 or not all_categories:
