@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # WELCOME PAGE TITLE
-st.title("Welcome to the Data Dashboard! 📊")
+st.title("Welcome to the Study Spot Ratings at GA Tech! 📊")
 
 # INTRODUCTORY TEXT
 st.write("""
@@ -23,7 +23,7 @@ You can navigate to the different pages using the sidebar on the left.
 - **Survey Page**: Go here to input new data into our CSV file.
 - **Visuals Page**: Go here to see the data visualized in different graphs.
 
-This project is part of CS 1301's Lab 2.
+This project is part of Siyash Tantia's CS 1301's Web Dev Lab 2.
 """)
 
 # OPTIONAL: ADD AN IMAGE
