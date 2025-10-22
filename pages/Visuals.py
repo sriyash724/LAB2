@@ -42,7 +42,7 @@ if "value" in csv_df.columns:
 else:
     csv_df["numeric_value"] = pd.Series(dtype=float)
 
-# Add a simple order index so we can plot values over time/order
+# Add a simple order index so we can plot values over time/order if needed
 csv_df["entry_index"] = range(1, len(csv_df) + 1)
 
 # 2. Load JSON safely
@@ -76,13 +76,12 @@ st.divider()
 st.header("Graphs")
 
 # GRAPH 1: STATIC GRAPH
-st.subheader("Graph 1: Static – JSON bar chart")  # CHANGE THIS TO THE TITLE OF YOUR GRAPH
-# - Create a static graph (e.g., bar chart, line chart) using st.bar_chart() or st.line_chart().
-# - Use data from either the CSV or JSON file.
-# - Write a description explaining what the graph shows.
+st.subheader("Graph 1: Static – Baseline popularity from JSON")  # CHANGE THIS TO THE TITLE OF YOUR GRAPH
+# - Static bar chart using st.bar_chart() from JSON.
+# - Shows the baseline reference values stored in data.json.
 if not json_bar_df.empty:
-    st.bar_chart(json_bar_df)  # static chart from JSON
-    st.caption("Static bar chart using **data.json**. Each bar shows the 'Value' for a 'Label'.")
+    st.bar_chart(json_bar_df)
+    st.caption("Static baseline from **data.json**. Useful as a reference to compare with real user ratings below.")
 else:
     st.warning("Placeholder for your first graph. (No valid JSON data to plot yet.)")
 
@@ -97,84 +96,85 @@ if "favorites" not in st.session_state:
     st.session_state["favorites"] = []  # persistent list across interactions  #NEW
 
 
-# GRAPH 2: DYNAMIC GRAPH
-st.subheader("Graph 2: Dynamic – CSV totals by category")  # CHANGE THIS TO THE TITLE OF YOUR GRAPH
-# - Create a dynamic graph that changes based on user input.
-# - Use at least one interactive widget (e.g., st.slider, st.selectbox, st.multiselect).
-# - Use Streamlit's Session State (st.session_state) to manage the interaction.
-# - Add a '#NEW' comment next to at least 3 new Streamlit functions you use in this lab.
-# - Write a description explaining the graph and how to interact with it.
+# GRAPH 2: DYNAMIC GRAPH – Average rating per spot
+st.subheader("Graph 2: Dynamic – Average rating per spot (CSV)")
+# - Dynamic bar chart driven by multiselect + Top-K slider.
+# - Uses Session State for a persistent favorites list.
 
 if csv_df["numeric_value"].notna().sum() == 0:
-    st.warning("No numeric values in **data.csv** yet. Submit numeric 'value' entries on the Survey page.")
+    st.warning("No numeric values in **data.csv** yet. Submit ratings on the Survey page.")
 else:
     picked = st.multiselect(  #NEW
-        "Choose categories to include",
+        "Choose spots to include",
         options=all_categories,
         default=all_categories,
         key="picked_categories",
     )
 
-    # Button to persist current picks into a favorites list stored in session state
     if st.button("Add current picks to favorites"):  #NEW
         st.session_state["favorites"] = sorted(list({*st.session_state["favorites"], *picked}))
         st.success(f"Favorites updated: {st.session_state['favorites']}")
 
     top_k = st.slider(  #NEW
-        "Show Top K categories (by total value)",
+        "Show Top K spots (by average rating)",
         min_value=1,
         max_value=max(1, len(all_categories) if all_categories else 1),
         value=min(5, len(all_categories) if all_categories else 1),
     )
 
-    # Filter and aggregate
+    # Filter to selected + favorites
     filt_df = csv_df.dropna(subset=["numeric_value"]).copy()
-    if picked:
-        filt_df = filt_df[filt_df["category"].isin(picked)]
+    effective = set(picked) | set(st.session_state["favorites"])
+    if effective:
+        filt_df = filt_df[filt_df["category"].isin(list(effective))]
 
-    totals = (
-        filt_df.groupby("category", as_index=False)["numeric_value"].sum().rename(columns={"numeric_value": "total"})
+    # Average rating per spot
+    avgs = (
+        filt_df.groupby("category", as_index=False)["numeric_value"].mean().rename(columns={"numeric_value": "avg_rating"})
     )
-    totals = totals.sort_values("total", ascending=False).head(top_k)
+    avgs = avgs.sort_values("avg_rating", ascending=False).head(top_k)
 
-    if not totals.empty:
-        bar_df = totals.set_index("category")["total"].to_frame()
-        st.area_chart(bar_df)
-        st.caption(
-            "Dynamic bar chart using **data.csv**. Use the multiselect to choose categories and the slider to limit to Top‑K."
-        )
+    if not avgs.empty:
+        avg_df = avgs.set_index("category")["avg_rating"].to_frame()
+        st.bar_chart(avg_df)
+        st.caption("Average rating per spot from **data.csv**. Use the multiselect, favorites, and Top‑K slider.")
     else:
         st.info("No rows match your current selection.")
 
 
-# GRAPH 3: DYNAMIC GRAPH
-st.subheader("Graph 3: Dynamic – CSV values over entry order")  # CHANGE THIS TO THE TITLE OF YOUR GRAPH
-# - Create another dynamic graph.
-# - If you used CSV data for Graph 1 & 2, you MUST use JSON data here (or vice-versa).
-#   (We used JSON in Graph 1 and CSV in Graph 2, so CSV here is acceptable.)
-# - This graph must also be interactive and use Session State.
-# - Remember to add a description and use '#NEW' comments.
+# GRAPH 3: DYNAMIC GRAPH – Number of ratings per spot
+st.subheader("Graph 3: Dynamic – Number of ratings per spot (CSV)")
+# - Dynamic bar chart that counts how many ratings each spot has received.
 
 if csv_df["numeric_value"].notna().sum() == 0 or not all_categories:
-    st.warning("Add some numeric CSV rows with categories to see this chart.")
+    st.warning("Add some ratings on the Survey page to see this chart.")
 else:
-    # Default to first favorite if available, otherwise first category
-    default_cat = st.session_state["favorites"][0] if st.session_state["favorites"] else all_categories[0]
-    chosen_cat = st.selectbox(  #NEW
-        "Pick a category to plot over entry order",
-        options=all_categories,
-        index=all_categories.index(default_cat) if default_cat in all_categories else 0,
-        key="chosen_category",
+    # Reuse the same selection and favorites
+    selected = st.session_state.get("picked_categories", all_categories)
+    effective = set(selected) | set(st.session_state["favorites"])
+
+    count_df = csv_df.dropna(subset=["numeric_value"]).copy()
+    if effective:
+        count_df = count_df[count_df["category"].isin(list(effective))]
+
+    counts = count_df.groupby("category", as_index=False).size().rename(columns={"size": "num_ratings"})
+
+    show_k = st.slider(  #NEW
+        "Show Top K spots (by number of ratings)",
+        min_value=1,
+        max_value=max(1, len(counts) if not counts.empty else 1),
+        value=min(5, len(counts) if not counts.empty else 1),
+        key="topk_counts",
     )
 
-    series_df = csv_df[(csv_df["category"] == chosen_cat) & (csv_df["numeric_value"].notna())][
-        ["entry_index", "numeric_value"]
-    ].set_index("entry_index")
+    counts = counts.sort_values("num_ratings", ascending=False).head(show_k)
 
-    if not series_df.empty:
-        st.line_chart(series_df)  # simple time/order series from CSV
-        st.caption(
-            "Dynamic line chart from **data.csv**. The select box chooses which category to plot; favorites persist in session state."
-        )
+    if not counts.empty:
+        cnt_df = counts.set_index("category")["num_ratings"].to_frame()
+        st.bar_chart(cnt_df)
+        st.caption("Number of ratings per spot from **data.csv**. Uses the same selection and favorites state.")
     else:
-        st.info("No numeric rows for the selected category yet.")
+        st.info("No rows match your current selection.")
+
+st.divider()
+st.write("Tip: Keep a core set of spots in **favorites** while you compare averages and rating counts.")
