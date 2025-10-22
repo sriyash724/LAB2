@@ -3,7 +3,8 @@
 
 import streamlit as st
 import pandas as pd
-import os  # The 'os' module is used for file system operations (e.g., checking if a file exists).
+import json  # To read study spots from data.json
+import os    # File checks
 
 # PAGE CONFIGURATION
 st.set_page_config(
@@ -13,63 +14,74 @@ st.set_page_config(
 
 # PAGE TITLE AND USER DIRECTIONS
 st.title("Data Collection Survey 📝")
-st.write("Please fill out the form below to add your data to the dataset.")
+st.write("Pick a study spot and give it a rating. Your response is saved to **data.csv**.")
 
 CSV_PATH = "data.csv"
+JSON_PATH = "data.json"
 
 
 def file_exists_and_not_empty(path: str) -> bool:
-    """Return True if the CSV exists and has at least one byte."""
+    """Return True if the file exists and has at least one byte."""
     return os.path.exists(path) and os.path.getsize(path) > 0
 
 
+def load_spots_from_json() -> list[str]:
+    """Load study spot labels from data.json → data_points[].label. Fallback to a default list."""
+    fallback = [
+        "Library",
+        "Dorm",
+        "Clough Commons",
+        "Student Center",
+        "Klaus Atrium",
+        "Outdoor Greens",
+        "Dining Hall",
+    ]
+    if file_exists_and_not_empty(JSON_PATH):
+        try:
+            with open(JSON_PATH, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            points = payload.get("data_points", [])
+            labels = [p.get("label") for p in points if isinstance(p, dict) and p.get("label")]
+            return labels or fallback
+        except Exception:
+            return fallback
+    return fallback
+
+
+# Load options once for the form
+study_spots = load_spots_from_json()
+
 # DATA INPUT FORM
-# 'st.form' creates a container that groups input widgets.
-# The form is submitted only when the user clicks the 'st.form_submit_button'.
-# This is useful for preventing the app from re-running every time a widget is changed.
+# 'st.form' groups inputs and runs only when you click the submit button.
 with st.form("survey_form"):
-    # Create text input widgets for the user to enter data.
-    # The first argument is the label that appears above the input box.
-    category_input = st.text_input("Enter a category:")
-    value_input = st.text_input("Enter a corresponding value:")
+    spot = st.selectbox("Choose a study spot:", options=study_spots)
+    rating = st.slider("Rate this spot (1–10):", min_value=1, max_value=10, value=7)
 
-    # The submit button for the form.
-    submitted = st.form_submit_button("Submit Data")
+    submitted = st.form_submit_button("Submit Rating")
 
-# This block of code runs ONLY when the submit button is clicked.
+# This block runs ONLY when the submit button is clicked.
 if submitted:
-    # --- IMPLEMENTATION: Append a new row to data.csv ---
-    # 1) Validate inputs
-    if not category_input.strip() or not value_input.strip():
-        st.error("Both fields are required. Please fill in all inputs.")
+    # Build a one-row DataFrame (column names match what Visuals.py expects)
+    new_row_df = pd.DataFrame([
+        {"category": spot, "value": rating}
+    ])
+
+    # Append or create the CSV
+    if file_exists_and_not_empty(CSV_PATH):
+        new_row_df.to_csv(CSV_PATH, mode="a", header=False, index=False)
     else:
-        # 2) Build a one-row DataFrame
-        new_row_df = pd.DataFrame([
-            {"category": category_input.strip(), "value": value_input.strip()}
-        ])
+        new_row_df.to_csv(CSV_PATH, index=False)
 
-        # 3) Append to the CSV
-        #    - If the file already has data, append without header.
-        #    - If it doesn't exist (or is empty), create it with header.
-        if file_exists_and_not_empty(CSV_PATH):
-            new_row_df.to_csv(CSV_PATH, mode="a", header=False, index=False)
-        else:
-            new_row_df.to_csv(CSV_PATH, index=False)
-
-        st.success("Your data has been submitted!")
-        st.write(f"You entered: **Category:** {category_input}, **Value:** {value_input}")
+    st.success("Saved! Your rating was added to data.csv.")
+    st.write(f"You chose **{spot}** and rated it **{rating}/10**.")
 
 
-# DATA DISPLAY
-# This section shows the current contents of the CSV file, which helps in debugging.
-st.divider()  # Adds a horizontal line for visual separation.
+# DATA DISPLAY (helps you verify rows are being added)
+st.divider()
 st.header("Current Data in CSV")
 
-# Check if the CSV file exists and is not empty before trying to read it.
 if file_exists_and_not_empty(CSV_PATH):
-    # Read the CSV file into a pandas DataFrame.
     current_data_df = pd.read_csv(CSV_PATH)
-    # Display the DataFrame as a table.
     st.dataframe(current_data_df, use_container_width=True)
 else:
     st.warning("The 'data.csv' file is empty or does not exist yet.")
