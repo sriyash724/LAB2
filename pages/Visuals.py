@@ -23,8 +23,7 @@ JSON_PATH = "data.json"
 # A crucial step is to load the data from the files.
 # It's important to add error handling to prevent the app from crashing if a file is empty or missing.
 
-st.divider()
-st.header("Load Data")
+
 
 # 1) Load CSV safely
 if os.path.exists(CSV_PATH) and os.path.getsize(CSV_PATH) > 0:
