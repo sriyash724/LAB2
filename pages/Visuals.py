@@ -176,5 +176,4 @@ else:
     else:
         st.info("No rows match your current selection.")
 
-st.divider()
-st.write("Tip: Keep a core set of spots in **favorites** while you compare averages and rating counts.")
+
