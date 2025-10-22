@@ -19,7 +19,6 @@ st.write("This page displays graphs based on the collected data.")
 CSV_PATH = "data.csv"
 JSON_PATH = "data.json"
 
-
 # DATA LOADING
 # A crucial step is to load the data from the files.
 # It's important to add error handling to prevent the app from crashing if a file is empty or missing.
@@ -27,7 +26,7 @@ JSON_PATH = "data.json"
 st.divider()
 st.header("Load Data")
 
-# 1. Load CSV safely
+# 1) Load CSV safely
 if os.path.exists(CSV_PATH) and os.path.getsize(CSV_PATH) > 0:
     try:
         csv_df = pd.read_csv(CSV_PATH)
@@ -42,10 +41,10 @@ if "value" in csv_df.columns:
 else:
     csv_df["numeric_value"] = pd.Series(dtype=float)
 
-# Add a simple order index so we can plot values over time/order if needed
+# Simple order index (handy if needed later)
 csv_df["entry_index"] = range(1, len(csv_df) + 1)
 
-# 2. Load JSON safely
+# 2) Load JSON safely
 if os.path.exists(JSON_PATH) and os.path.getsize(JSON_PATH) > 0:
     try:
         with open(JSON_PATH, "r", encoding="utf-8") as f:
@@ -59,14 +58,12 @@ else:
 json_points = json_payload.get("data_points", [])
 json_df = pd.DataFrame(json_points)
 if not json_df.empty and {"label", "value"}.issubset(json_df.columns):
-    json_bar_df = json_df.rename(columns={"label": "Label", "value": "Value"}).set_index("Label")[
-        ["Value"]
-    ]
+    # Index on label so st.bar_chart can use it directly
+    json_bar_df = json_df.rename(columns={"label": "Label", "value": "Value"}).set_index("Label")[["Value"]]
 else:
     json_bar_df = pd.DataFrame({"Value": []})
 
 st.success("Data loaded. If files are empty, placeholder structures are used.")
-
 
 # GRAPH CREATION
 # The lab requires you to create 3 graphs: one static and two dynamic.
@@ -75,16 +72,14 @@ st.success("Data loaded. If files are empty, placeholder structures are used.")
 st.divider()
 st.header("Graphs")
 
-# GRAPH 1: STATIC GRAPH
-st.subheader("Graph 1: Static – Baseline popularity from JSON")  # CHANGE THIS TO THE TITLE OF YOUR GRAPH
-# - Static bar chart using st.bar_chart() from JSON.
-# - Shows the baseline reference values stored in data.json.
+# GRAPH 1: STATIC GRAPH (BAR)
+st.subheader("Graph 1: Static – Baseline from JSON (Bar)")
+# Static bar chart using data.json as a reference baseline.
 if not json_bar_df.empty:
     st.bar_chart(json_bar_df)
-    st.caption("Static baseline from **data.json**. Useful as a reference to compare with real user ratings below.")
+    st.caption("Static baseline from **data.json** (bar chart). Compare this reference with the live user ratings below.")
 else:
-    st.warning("Placeholder for your first graph. (No valid JSON data to plot yet.)")
-
+    st.warning("No valid JSON data to plot yet.")
 
 # Prepare category list from CSV for dynamic charts
 all_categories = (
@@ -95,10 +90,9 @@ all_categories = (
 if "favorites" not in st.session_state:
     st.session_state["favorites"] = []  # persistent list across interactions  #NEW
 
-
-# GRAPH 2: DYNAMIC GRAPH – Average rating per spot
-st.subheader("Graph 2: Dynamic – Average rating per spot (CSV)")
-# - Dynamic bar chart driven by multiselect + Top-K slider.
+# GRAPH 2: DYNAMIC GRAPH (LINE) – Average rating per spot
+st.subheader("Graph 2: Dynamic – Average rating per spot (Line, CSV)")
+# - Dynamic line chart driven by multiselect + Top-K slider.
 # - Uses Session State for a persistent favorites list.
 
 if csv_df["numeric_value"].notna().sum() == 0:
@@ -130,30 +124,31 @@ else:
 
     # Average rating per spot
     avgs = (
-        filt_df.groupby("category", as_index=False)["numeric_value"].mean().rename(columns={"numeric_value": "avg_rating"})
+        filt_df.groupby("category", as_index=False)["numeric_value"]
+        .mean()
+        .rename(columns={"numeric_value": "avg_rating"})
     )
     avgs = avgs.sort_values("avg_rating", ascending=False).head(top_k)
 
     if not avgs.empty:
-        avg_df = avgs.set_index("category")["avg_rating"].to_frame()
-        st.bar_chart(avg_df)
-        st.caption("Average rating per spot from **data.csv**. Use the multiselect, favorites, and Top‑K slider.")
+        # LINE CHART with explicit x/y so categories appear on the x-axis
+        st.line_chart(avgs, x="category", y="avg_rating")
+        st.caption("Average rating per spot from **data.csv** (line chart). Use the multiselect, favorites, and Top-K slider.")
     else:
         st.info("No rows match your current selection.")
 
+# GRAPH 3: DYNAMIC GRAPH (SCATTER) – Number of ratings per spot
+st.subheader("Graph 3: Dynamic – Number of ratings per spot (Scatter, CSV)")
+# - Dynamic scatter chart that counts how many ratings each spot has received.
 
-# GRAPH 3: DYNAMIC GRAPH – Number of ratings per spot
-st.subheader("Graph 3: Dynamic – Number of ratings per spot (CSV)")
-# - Dynamic bar chart that counts how many ratings each spot has received.
-
-if csv_df["numeric_value"].notna().sum() == 0 or not all_categories:
+if len(csv_df) == 0 or not all_categories:
     st.warning("Add some ratings on the Survey page to see this chart.")
 else:
     # Reuse the same selection and favorites
     selected = st.session_state.get("picked_categories", all_categories)
     effective = set(selected) | set(st.session_state["favorites"])
 
-    count_df = csv_df.dropna(subset=["numeric_value"]).copy()
+    count_df = csv_df.copy()  # counts don't require numeric values
     if effective:
         count_df = count_df[count_df["category"].isin(list(effective))]
 
@@ -170,10 +165,8 @@ else:
     counts = counts.sort_values("num_ratings", ascending=False).head(show_k)
 
     if not counts.empty:
-        cnt_df = counts.set_index("category")["num_ratings"].to_frame()
-        st.bar_chart(cnt_df)
-        st.caption("Number of ratings per spot from **data.csv**. Uses the same selection and favorites state.")
+        # SCATTER CHART with categorical x and numeric y
+        st.scatter_chart(counts, x="category", y="num_ratings")
+        st.caption("Number of ratings per spot from **data.csv** (scatter chart). Uses the same selection and favorites state.")
     else:
         st.info("No rows match your current selection.")
-
-
